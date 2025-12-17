@@ -8,15 +8,13 @@ use Illuminate\Database\Eloquent\Model;
 class Kelas extends Model
 {
     use HasFactory;
-
     protected $table = 'kelas';
+    protected $guarded = [];
 
-    protected $guarded = ['id']; // Semua kolom boleh diisi kecuali ID
-
-    // Satu Kelas punya banyak Siswa
+    // RELASI: Satu Kelas punya banyak Siswa (User)
     public function siswa()
     {
-        // Kita filter yang role-nya siswa saja
-        return $this->hasMany(User::class, 'kelas_id')->where('role', 'siswa');
+        // Pastikan 'kelas_id' sesuai dengan kolom di tabel pengguna
+        return $this->hasMany(User::class, 'kelas_id');
     }
 }

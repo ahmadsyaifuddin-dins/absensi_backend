@@ -14,18 +14,20 @@ class AuthController extends Controller
     {
         // 1. Validasi Input
         $request->validate([
-            'email' => 'required|email',
+            'login_id' => 'required',
             'password' => 'required',
         ]);
 
         // 2. Cari User berdasarkan Email
-        $user = User::where('email', $request->email)->first();
+        $user = User::where('email', $request->login_id)
+                    ->orWhere('nisn_nip', $request->login_id)
+                    ->first();
 
         // 3. Cek Password
-        if (! $user || ! Hash::check($request->password, $user->password)) {
+        if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Email atau Password salah',
+                'message' => 'NISN/NIP atau Password salah',
             ], 401);
         }
 

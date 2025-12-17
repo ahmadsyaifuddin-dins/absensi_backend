@@ -13,11 +13,12 @@ return new class extends Migration
     {
         Schema::create('pengaturan_sekolah', function (Blueprint $table) {
             $table->id();
-            $table->decimal('latitude_kantor', 10, 8); // Titik pusat sekolah
-            $table->decimal('longitude_kantor', 11, 8);
-            $table->decimal('radius_km', 5, 2)->default(0.05); // 0.05 km = 50 meter
+            $table->string('nama_sekolah', 255);
+            $table->decimal('latitude', 10, 8); // Titik pusat sekolah
+            $table->decimal('longitude', 11, 8);
+            $table->decimal('radius_meter', 5, 2)->default(0.05); // 0.05 km = 50 meter
             $table->time('jam_masuk')->default('07:30:00');
-            $table->time('jam_pulang')->default('15:00:00');
+            // $table->time('jam_pulang')->default('15:00:00');
             $table->timestamps();
         });
     }
