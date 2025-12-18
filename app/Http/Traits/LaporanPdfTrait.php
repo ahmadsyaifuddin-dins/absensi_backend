@@ -130,35 +130,51 @@ trait LaporanPdfTrait
     // 4. EXPORT PDF REKAP IZIN (HISTORY)
     public function exportIzinPdf(Request $request)
     {
+        // Filter Wajib
         $bulan = (int) $request->bulan;
         $tahun = (int) $request->tahun;
-        $kelasId = $request->kelas_id; // Opsional: Bisa filter per kelas
+        
+        // Filter Opsional
+        $kelasId = $request->kelas_id;
+        $kategori = $request->kategori; // 'Semua', 'Sakit', atau 'Izin'
 
-        // Query Izin/Sakit yang SUDAH DITERIMA
+        // Query: Ambil Diterima DAN Ditolak (Agar history lengkap seperti di JSON)
         $query = Absensi::with(['user.kelas'])
             ->whereIn('status', ['Izin', 'Sakit'])
-            ->where('validasi', 'Diterima') // Hanya yang valid
+            ->whereIn('validasi', ['Diterima', 'Ditolak'])
             ->whereMonth('tanggal', $bulan)
-            ->whereYear('tanggal', $tahun)
-            ->orderBy('tanggal', 'asc');
+            ->whereYear('tanggal', $tahun);
 
-        // Jika Guru memilih filter kelas
-        if ($kelasId) {
+        // Filter Kategori (Sakit / Izin)
+        if ($kategori && $kategori != 'Semua') {
+            $query->where('status', $kategori);
+        }
+
+        // Filter Kelas (Hanya jika dikirim dan valid)
+        if ($kelasId && $kelasId != 'null') {
             $query->whereHas('user', function($q) use ($kelasId) {
                 $q->where('kelas_id', $kelasId);
             });
         }
+        
+        $data = $query->orderBy('tanggal', 'asc')->get();
 
-        $data = $query->get();
+        // Judul Dinamis
+        $judul = 'REKAPITULASI IZIN & SAKIT (SEMUA KELAS)';
+        if ($kategori == 'Sakit') $judul = 'LAPORAN SISWA SAKIT';
+        if ($kategori == 'Izin') $judul = 'LAPORAN SISWA IZIN';
+
         $namaBulan = Carbon::create()->month($bulan)->locale('id')->translatedFormat('F');
 
         $pdf = Pdf::loadView('laporan.izin_pdf', [
             'data' => $data,
-            'bulan' => $namaBulan,
+            'judul_laporan' => $judul,
+            'periode' => "Periode: $namaBulan $tahun",
+            'bulan' => $namaBulan, 
             'tahun' => $tahun
         ]);
 
-        return $pdf->stream('rekap-izin.pdf');
+        return $pdf->stream('laporan-rekap-izin.pdf');
     }
 
     public function exportTelatPdf(Request $request)

@@ -9,8 +9,7 @@
             <h2 style="margin: 0; font-family: serif; text-transform: uppercase;">PEMERINTAH PROVINSI KALIMANTAN SELATAN
             </h2>
             <h1 style="margin: 5px 0; font-family: sans-serif;">SMAN 3 BANJARMASIN</h1>
-            <p style="margin: 0; font-size: 12px; font-style: italic;">Jl. Ahmad Yani Km. 6, Banjarmasin, Kalimantan
-                Selatan</p>
+            <p style="margin: 0; font-size: 12px; font-style: italic;">Jalan Veteran No. 381, Kelurahan Sungai Bilu, Kecamatan Banjarmasin Timur, Kota Banjarmasin, Provinsi Kalimantan Selatan, 70236</p>
         </td>
     </tr>
 </table>

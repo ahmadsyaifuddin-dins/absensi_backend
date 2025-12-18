@@ -17,7 +17,8 @@ class Absensi extends Model
     protected $casts = [
         'terlambat' => 'boolean', // Jadi true/false
         'menit_keterlambatan' => 'integer',
-        'tanggal' => 'date', // Jadi format tanggal Carbon
+        // 'tanggal' => 'date', // Jadi format tanggal Carbon
+        'tanggal' => 'date:Y-m-d',
     ];
 
     // Relasi balik ke User

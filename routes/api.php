@@ -5,7 +5,6 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AbsensiController;
 use App\Http\Controllers\Api\DashboardController;
-use App\Http\Controllers\Api\IzinController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\SekolahController;
 use App\Http\Controllers\Api\SiswaController;
@@ -16,27 +15,25 @@ use App\Http\Controllers\Api\LaporanController;
 Route::post('/login', [AuthController::class, 'login']);
 Route::get('/sekolah', [SekolahController::class, 'index']);
 
-
+// Export PDF (Bypass Auth untuk Browser)
 Route::get('/laporan/harian/export', [LaporanController::class, 'exportHarianPdf']);
 Route::get('/laporan/bulanan/export', [LaporanController::class, 'exportBulananPdf']);
-Route::get('/laporan/siswa/export', [LaporanController::class, 'exportSiswaPdf']); // Public (untuk download)
-
-Route::get('/laporan/izin/export', [LaporanController::class, 'exportIzinPdf']);
+Route::get('/laporan/siswa/export', [LaporanController::class, 'exportSiswaPdf']); 
 Route::get('/laporan/telat/export', [LaporanController::class, 'exportTelatPdf']);
+// Kita modifikasi route izin ini agar bisa menerima filter status
+Route::get('/laporan/izin/export', [LaporanController::class, 'exportIzinPdf']); 
 
-// --- PROTECTED ROUTES ---
+// --- PROTECTED ROUTES (Butuh Token) ---
 Route::middleware('auth:sanctum')->group(function () {
 
-    Route::get('/user', function (Request $request) {
-        return $request->user();
-    });
+    Route::get('/user', function (Request $request) { return $request->user(); });
 
-    // Profil & Password
+    // Profil & Auth
     Route::post('/profile/update', [ProfileController::class, 'updateProfile']);
     Route::post('/profile/password', [ProfileController::class, 'updatePassword']);
     Route::post('/logout', [AuthController::class, 'logout']);
 
-    // API Absensi
+    // API Absensi (Siswa)
     Route::post('/absensi', [AbsensiController::class, 'store']);
     Route::get('/absensi/check-today', [AbsensiController::class, 'checkToday']);
     Route::get('/riwayat-absensi', [AbsensiController::class, 'history']);
@@ -45,36 +42,37 @@ Route::middleware('auth:sanctum')->group(function () {
     // Dashboard Guru
     Route::get('/dashboard/guru', [DashboardController::class, 'index']);
 
-    // Validasi Izin (Guru)
-    Route::get('/izin/list', [IzinController::class, 'index']);
-    Route::post('/izin/approve/{id}', [IzinController::class, 'update']);
-
-    // Pengaturan Sekolah (Guru)
+    // --- MANAJEMEN DATA (GURU) ---
+    // Sekolah
     Route::post('/sekolah/update', [SekolahController::class, 'update']);
 
-    // Manajemen Siswa (CRUD)
+    // Siswa
     Route::get('/siswa', [SiswaController::class, 'index']);
     Route::post('/siswa', [SiswaController::class, 'store']);
     Route::post('/siswa/update/{id}', [SiswaController::class, 'update']);
     Route::delete('/siswa/{id}', [SiswaController::class, 'destroy']);
     Route::get('/data-kelas', [SiswaController::class, 'getKelas']);
 
+    // Kelas
     Route::get('/kelas', [KelasController::class, 'index']);
     Route::post('/kelas', [KelasController::class, 'store']);
     Route::post('/kelas/update/{id}', [KelasController::class, 'update']);
     Route::delete('/kelas/{id}', [KelasController::class, 'destroy']);
 
-    // === ROUTE LAPORAN GURU ===
+    // --- PUSAT LAPORAN & VALIDASI (GURU) ---
+    // Laporan View JSON
     Route::get('/laporan/harian', [LaporanController::class, 'harian']);
     Route::get('/laporan/bulanan', [LaporanController::class, 'bulanan']);
     Route::get('/laporan/siswa', [LaporanController::class, 'detailSiswa']);
     Route::get('/laporan/telat', [LaporanController::class, 'rekapTelat']);
+    Route::get('/laporan/rekap-izin', [LaporanController::class, 'rekapIzinJson']); // History Izin
 
-    // === ROUTE VALIDASI IZIN ===
-    Route::get('/laporan/pengajuan-izin', [LaporanController::class, 'listPengajuanIzin']);
-    Route::post('/laporan/verifikasi-izin', [LaporanController::class, 'verifikasiIzin']);
+    // Validasi Izin (Pengganti IzinController)
+    // 1. List data pending
+    Route::get('/laporan/pengajuan-izin', [LaporanController::class, 'listPengajuanIzin']); 
+    // 2. Aksi Terima/Tolak
+    Route::post('/laporan/verifikasi-izin', [LaporanController::class, 'verifikasiIzin']); 
 
-    Route::get('/laporan/rekap-izin', [LaporanController::class, 'rekapIzinJson']);
-
-    Route::get('/list-siswa-by-kelas', [LaporanController::class, 'getSiswaByKelas']); // Buat dropdown
+    // Helper Dropdown
+    Route::get('/list-siswa-by-kelas', [LaporanController::class, 'getSiswaByKelas']);
 });

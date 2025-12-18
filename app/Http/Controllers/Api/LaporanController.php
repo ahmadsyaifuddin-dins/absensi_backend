@@ -182,15 +182,22 @@ class LaporanController extends Controller
     {
         $bulan = (int) $request->bulan;
         $tahun = (int) $request->tahun;
-        
+        $kategori = $request->kategori;
+
+        // Base Query: Ambil Diterima DAN Ditolak (Kecuali Pending)
         $query = Absensi::with(['user.kelas'])
             ->whereIn('status', ['Izin', 'Sakit'])
-            ->where('validasi', 'Diterima') 
+            ->whereIn('validasi', ['Diterima', 'Ditolak'])
             ->whereMonth('tanggal', $bulan)
             ->whereYear('tanggal', $tahun)
             ->orderBy('tanggal', 'desc');
             
-        // Opsional Filter Kelas
+        // 1. Filter Kategori (Jika bukan 'Semua')
+        if ($kategori && $kategori != 'Semua') {
+            $query->where('status', $kategori);
+        }
+
+        // 2. Filter Kelas (Hapus juga jika di frontend sudah dihapus, tapi biarkan untuk jaga-jaga)
         if ($request->filled('kelas_id')) {
              $query->whereHas('user', function($q) use ($request) {
                 $q->where('kelas_id', $request->kelas_id);
