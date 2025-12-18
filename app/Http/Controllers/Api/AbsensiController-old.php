@@ -13,27 +13,16 @@ use Illuminate\Support\Str;
 
 class AbsensiController extends Controller
 {
-    // ======================================================
-    // 1. FUNGSI CHECK-IN (ABSEN MASUK)
-    // ======================================================
     public function store(Request $request)
     {
         $user = $request->user();
         $today = Carbon::today();
 
-        // A. CEK HARI SABTU & MINGGU (FIXED) 
-        // Logic: Jika Hari Weekend DAN Bypass-nya TIDAK aktif, maka tolak.
-        if ($today->isWeekend() && env('BYPASS_WEEKEND') != true) { 
+        // 1. Cek Hari Libur
+        $isHoliday = HariLibur::where('tanggal', $today->toDateString())->exists();
+        if ($isHoliday) {
             return response()->json([
-                'message' => 'Hari ini akhir pekan (Sabtu/Minggu), sekolah libur!',
-            ], 400);
-        }
-
-        // B. CEK HARI LIBUR DINAMIS (DATABASE)
-        $libur = HariLibur::where('tanggal', $today->toDateString())->first();
-        if ($libur) {
-            return response()->json([
-                'message' => 'Sekolah Libur: ' . $libur->keterangan,
+                'message' => 'Hari ini libur, tidak bisa absen!',
             ], 400);
         }
 
@@ -69,8 +58,9 @@ class AbsensiController extends Controller
             $setting->longitude  
         );
 
+        // Bulatkan jarak biar rapi
         $jarakMeter = round($jarakMeter);
-        $batasRadius = $setting->radius_meter;
+        $batasRadius = $setting->radius_meter; // Ambil dari DB (integer)
 
         // Cek Radius
         if ($jarakMeter > $batasRadius) {
@@ -84,6 +74,7 @@ class AbsensiController extends Controller
         $isLate = false;
         $lateDuration = 0;
 
+        // Bandingkan jam sekarang dengan jam masuk
         if ($jamSekarang > $setting->jam_masuk) {
             $isLate = true;
             $waktuMasuk = Carbon::parse($setting->jam_masuk);
@@ -116,55 +107,6 @@ class AbsensiController extends Controller
         ], 201);
     }
 
-    // ======================================================
-    // 2. CEK STATUS HARI INI (UNTUK HOME SCREEN APP)
-    // ======================================================
-    public function checkToday(Request $request)
-    {
-        $user = $request->user();
-        $today = Carbon::today();
-        
-        // --- LOGIC STATUS LIBUR UNTUK UI ---
-        $isHoliday = false;
-        $holidayMessage = "";
-
-        // 1. Cek Weekend
-        if ($today->isWeekend()) {
-            $isHoliday = true;
-            $holidayMessage = "Libur Akhir Pekan";
-        } else {
-            // 2. Cek Database Libur
-            $libur = HariLibur::where('tanggal', $today->toDateString())->first();
-            if ($libur) {
-                $isHoliday = true;
-                $holidayMessage = $libur->keterangan;
-            }
-        }
-
-        // Cek Data Absen
-        $absen = Absensi::where('pengguna_id', $user->id)
-                        ->whereDate('tanggal', $today)
-                        ->first();
-
-        $user->load('kelas'); 
-        $namaKelas = $user->kelas ? $user->kelas->nama_kelas : 'Belum ada kelas';
-
-        return response()->json([
-            'message' => 'Status absen hari ini',
-            'data' => [
-                'sudah_absen' => $absen ? true : false,
-                'jam_absen' => $absen ? $absen->jam_masuk : null,
-                'nama_kelas' => $namaKelas,
-                // Kirim info libur ke Frontend
-                'is_holiday' => $isHoliday,
-                'holiday_message' => $holidayMessage
-            ]
-        ]);
-    }
-
-    // ======================================================
-    // 3. RIWAYAT ABSENSI
-    // ======================================================
     public function history(Request $request)
     {
         $history = Absensi::where('pengguna_id', $request->user()->id)
@@ -178,20 +120,10 @@ class AbsensiController extends Controller
         ]);
     }
 
-    // ======================================================
-    // 4. PENGAJUAN IZIN / SAKIT
-    // ======================================================
     public function izin(Request $request)
     {
         $user = $request->user();
         $today = Carbon::today();
-
-        // Cek Libur juga disini (Masa izin pas hari libur?)
-        if ($today->isWeekend() || HariLibur::where('tanggal', $today->toDateString())->exists()) {
-             return response()->json([
-                'message' => 'Hari ini libur, tidak perlu mengajukan izin.',
-            ], 400);
-        }
 
         $cekAbsen = Absensi::where('pengguna_id', $user->id)
             ->whereDate('tanggal', $today)
@@ -231,11 +163,33 @@ class AbsensiController extends Controller
         ], 201);
     }
 
-    // LOGIC HITUNG JARAK (Meter)
+    public function checkToday(Request $request)
+    {
+        $user = $request->user();
+        
+        $today = Carbon::today();
+        $absen = Absensi::where('pengguna_id', $user->id)
+                        ->whereDate('tanggal', $today)
+                        ->first();
+
+        $user->load('kelas'); 
+        $namaKelas = $user->kelas ? $user->kelas->nama_kelas : 'Belum ada kelas';
+
+        return response()->json([
+            'message' => 'Status absen hari ini',
+            'data' => [
+                'sudah_absen' => $absen ? true : false,
+                'jam_absen' => $absen ? $absen->jam_masuk : null,
+                'nama_kelas' => $namaKelas,
+            ]
+        ]);
+    }
+
+    // LOGIC MENGHITUNG JARAK (METER)
     private function calculateDistance($lat1, $lon1, $lat2, $lon2)
     {
-        // Radius Bumi ke METER
-        $earthRadius = 6371000; // 6371 KM * 1000 
+        // 1. Ubah Radius Bumi ke METER
+        $earthRadius = 6371000; // 6371 KM * 1000
 
         $dLat = deg2rad($lat2 - $lat1);
         $dLon = deg2rad($lon2 - $lon1);
@@ -246,7 +200,7 @@ class AbsensiController extends Controller
 
         $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
 
-        $distance = $earthRadius * $c; 
+        $distance = $earthRadius * $c; // Hasil langsung dalam Meter
 
         return $distance;
     }
