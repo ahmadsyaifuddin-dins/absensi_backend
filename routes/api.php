@@ -18,6 +18,11 @@ Route::get('/sekolah', [SekolahController::class, 'index']);
 
 
 Route::get('/laporan/harian/export', [LaporanController::class, 'exportHarianPdf']);
+Route::get('/laporan/bulanan/export', [LaporanController::class, 'exportBulananPdf']);
+Route::get('/laporan/siswa/export', [LaporanController::class, 'exportSiswaPdf']); // Public (untuk download)
+
+Route::get('/laporan/izin/export', [LaporanController::class, 'exportIzinPdf']);
+Route::get('/laporan/telat/export', [LaporanController::class, 'exportTelatPdf']);
 
 // --- PROTECTED ROUTES ---
 Route::middleware('auth:sanctum')->group(function () {
@@ -68,4 +73,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // === ROUTE VALIDASI IZIN ===
     Route::get('/laporan/pengajuan-izin', [LaporanController::class, 'listPengajuanIzin']);
     Route::post('/laporan/verifikasi-izin', [LaporanController::class, 'verifikasiIzin']);
+
+    Route::get('/laporan/rekap-izin', [LaporanController::class, 'rekapIzinJson']);
+
+    Route::get('/list-siswa-by-kelas', [LaporanController::class, 'getSiswaByKelas']); // Buat dropdown
 });

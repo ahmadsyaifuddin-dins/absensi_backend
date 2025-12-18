@@ -31,11 +31,6 @@
             background-color: #f2f2f2;
         }
 
-        .header {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-
         .meta {
             margin-bottom: 10px;
             font-size: 14px;
@@ -44,10 +39,8 @@
 </head>
 
 <body>
-    <div class="header">
-        <h2>LAPORAN KEHADIRAN HARIAN</h2>
-        <h3>SMAN 3 BANJARMASIN</h3>
-    </div>
+    {{-- 1. Panggil Header Reusable --}}
+    @include('laporan._header', ['judul_laporan' => 'LAPORAN KEHADIRAN HARIAN'])
 
     <div class="meta">
         <strong>Kelas:</strong> {{ $kelas->nama_kelas }} <br>
@@ -89,7 +82,7 @@
     </table>
 
     <div style="margin-top: 30px; float: right; text-align: center;">
-        <p>Banjarmasin, {{ date('d F Y') }}</p>
+        <p>Banjarmasin, {{ \Carbon\Carbon::parse($tanggal)->locale('id')->translatedFormat('d F Y') }}</p>
         <p>Mengetahui,</p>
         <br><br><br>
         <p><strong>( Guru Piket / Wali Kelas )</strong></p>

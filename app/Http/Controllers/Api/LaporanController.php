@@ -5,18 +5,21 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Absensi;
+use App\Models\Kelas;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
-use Barryvdh\DomPDF\Facade\Pdf;
-use App\Models\Kelas;
+use App\Http\Traits\LaporanPdfTrait; 
 
 class LaporanController extends Controller
 {
     // ==========================================
-    // 1. LAPORAN HARIAN (PER KELAS)
+    // (Otomatis method exportHarianPdf, exportBulananPdf, exportSiswaPdf masuk sini)
     // ==========================================
-    // Menampilkan siapa yang Hadir, Izin, Sakit, atau Belum Absen pada tanggal tertentu
+    use LaporanPdfTrait; 
+
+    // ==========================================
+    // 1. LAPORAN HARIAN (JSON - Untuk Preview di HP)
+    // ==========================================
     public function harian(Request $request)
     {
         $request->validate([
@@ -51,7 +54,7 @@ class LaporanController extends Controller
             $dataLaporan[] = [
                 'nama' => $s->nama,
                 'nisn' => $s->nisn_nip,
-                'foto_profil' => $s->foto_profil, // Buat nampilin muka di list
+                'foto_profil' => $s->foto_profil, // Buat nampilin muka di list view HP
                 'status' => $status,
                 'jam_masuk' => $jam,
                 'terlambat' => $absen ? $absen->terlambat : false,
@@ -64,66 +67,20 @@ class LaporanController extends Controller
         ]);
     }
 
-    public function exportHarianPdf(Request $request)
-    {
-        // 1. Ambil Data (Copy logic dari fungsi harian tadi)
-        $kelasId = $request->kelas_id;
-        $tanggal = $request->tanggal;
-
-        $siswa = User::where('role', 'siswa')
-                     ->where('kelas_id', $kelasId)
-                     ->orderBy('nama', 'asc')
-                     ->get();
-
-        $dataLaporan = [];
-
-        foreach ($siswa as $s) {
-            $absen = Absensi::where('pengguna_id', $s->id)
-                            ->whereDate('tanggal', $tanggal)
-                            ->first();
-
-            $status = 'Belum Absen';
-            $jam = '-';
-            
-            if ($absen) {
-                $status = $absen->status;
-                $jam = $absen->jam_masuk ?? '-';
-            }
-
-            $dataLaporan[] = [
-                'nama' => $s->nama,
-                'nisn' => $s->nisn_nip,
-                'status' => $status,
-                'jam_masuk' => $jam,
-                'terlambat' => $absen ? $absen->terlambat : false,
-            ];
-        }
-
-        // 2. Ambil Info Kelas (Buat Kop Surat)
-        $kelas = Kelas::find($kelasId);
-
-        // 3. Generate PDF
-        $pdf = Pdf::loadView('laporan.harian_pdf', [
-            'data' => $dataLaporan,
-            'kelas' => $kelas,
-            'tanggal' => $tanggal
-        ]);
-
-        // 4. Stream (Tampilkan di browser) atau Download
-        return $pdf->stream('laporan-harian.pdf');
-    }
 
     // ==========================================
-    // 2. REKAP BULANAN (PER KELAS)
+    // 2. REKAP BULANAN (JSON - Untuk Preview di HP)
     // ==========================================
-    // Statistik: Si Udin bulan ini Hadir brp kali, Sakit brp kali
     public function bulanan(Request $request)
     {
         $request->validate([
             'kelas_id' => 'required',
-            'bulan' => 'required|integer|min:1|max:12',
-            'tahun' => 'required|integer',
+            'bulan' => 'required',
+            'tahun' => 'required',
         ]);
+
+        $bulan = (int) $request->bulan;
+        $tahun = (int) $request->tahun;
 
         $siswa = User::where('role', 'siswa')
                      ->where('kelas_id', $request->kelas_id)
@@ -135,8 +92,8 @@ class LaporanController extends Controller
         foreach ($siswa as $s) {
             // Hitung statistik menggunakan query agregat biar cepat
             $stats = Absensi::where('pengguna_id', $s->id)
-                ->whereMonth('tanggal', $request->bulan)
-                ->whereYear('tanggal', $request->tahun)
+                ->whereMonth('tanggal', $bulan)
+                ->whereYear('tanggal', $tahun)
                 ->selectRaw("
                     count(CASE WHEN status = 'Hadir' THEN 1 END) as hadir,
                     count(CASE WHEN status = 'Izin' THEN 1 END) as izin,
@@ -147,20 +104,20 @@ class LaporanController extends Controller
 
             $dataLaporan[] = [
                 'nama' => $s->nama,
-                'hadir' => $stats->hadir,
-                'izin' => $stats->izin,
-                'sakit' => $stats->sakit,
-                'telat' => $stats->telat,
+                'hadir' => $stats->hadir ?? 0,
+                'izin' => $stats->izin ?? 0,
+                'sakit' => $stats->sakit ?? 0,
+                'telat' => $stats->telat ?? 0,
             ];
         }
 
         return response()->json(['data' => $dataLaporan]);
     }
 
+
     // ==========================================
-    // 3. DETAIL ABSENSI (PER SISWA)
+    // 3. DETAIL ABSENSI / TRACK RECORD (JSON - Preview HP)
     // ==========================================
-    // Track record satu siswa
     public function detailSiswa(Request $request)
     {
         $request->validate(['user_id' => 'required']);
@@ -172,10 +129,25 @@ class LaporanController extends Controller
         return response()->json(['data' => $history]);
     }
 
+
+    // ==========================================
+    // HELPER: AMBIL SISWA BERDASARKAN KELAS
+    // ==========================================
+    // Dipakai untuk dropdown di Laporan Siswa
+    public function getSiswaByKelas(Request $request)
+    {
+        $siswa = User::where('kelas_id', $request->kelas_id)
+                     ->where('role', 'siswa')
+                     ->orderBy('nama', 'asc')
+                     ->get();
+                     
+        return response()->json(['data' => $siswa]);
+    }
+
+
     // ==========================================
     // 4. LIST PENGAJUAN IZIN (BUTUH VALIDASI)
     // ==========================================
-    // Menampilkan daftar siswa yg statusnya Izin/Sakit DAN validasinya masih 'Pending'
     public function listPengajuanIzin()
     {
         $data = Absensi::with(['user.kelas']) // Load data user & kelasnya
@@ -187,7 +159,10 @@ class LaporanController extends Controller
         return response()->json(['data' => $data]);
     }
 
+
+    // ==========================================
     // AKSI: TERIMA / TOLAK IZIN
+    // ==========================================
     public function verifikasiIzin(Request $request)
     {
         $request->validate([
@@ -203,10 +178,31 @@ class LaporanController extends Controller
         return response()->json(['message' => 'Status izin berhasil diubah menjadi ' . $request->aksi]);
     }
 
+    public function rekapIzinJson(Request $request)
+    {
+        $bulan = (int) $request->bulan;
+        $tahun = (int) $request->tahun;
+        
+        $query = Absensi::with(['user.kelas'])
+            ->whereIn('status', ['Izin', 'Sakit'])
+            ->where('validasi', 'Diterima') 
+            ->whereMonth('tanggal', $bulan)
+            ->whereYear('tanggal', $tahun)
+            ->orderBy('tanggal', 'desc');
+            
+        // Opsional Filter Kelas
+        if ($request->filled('kelas_id')) {
+             $query->whereHas('user', function($q) use ($request) {
+                $q->where('kelas_id', $request->kelas_id);
+            });
+        }
+
+        return response()->json(['data' => $query->get()]);
+    }
+
     // ==========================================
     // 5. LAPORAN KETERLAMBATAN (TOP SKOR)
     // ==========================================
-    // Siapa raja telat bulan ini?
     public function rekapTelat(Request $request)
     {
         $request->validate([
@@ -214,10 +210,9 @@ class LaporanController extends Controller
             'tahun' => 'required'
         ]);
 
-        // Query agak kompleks: Join user, filter bulan, filter telat, group by user, sum menit
         $data = DB::table('absensi')
             ->join('pengguna', 'absensi.pengguna_id', '=', 'pengguna.id')
-            ->join('kelas', 'pengguna.kelas_id', '=', 'kelas.id') // Join kelas buat info
+            ->join('kelas', 'pengguna.kelas_id', '=', 'kelas.id')
             ->select(
                 'pengguna.nama',
                 'kelas.nama_kelas',
@@ -228,8 +223,8 @@ class LaporanController extends Controller
             ->whereMonth('absensi.tanggal', $request->bulan)
             ->whereYear('absensi.tanggal', $request->tahun)
             ->groupBy('pengguna.id', 'pengguna.nama', 'kelas.nama_kelas')
-            ->orderByDesc('total_menit') // Urutkan dari yg paling lama telatnya
-            ->limit(10) // Ambil Top 10 aja biar gak kepanjangan
+            ->orderByDesc('total_menit')
+            ->limit(10)
             ->get();
 
         return response()->json(['data' => $data]);
