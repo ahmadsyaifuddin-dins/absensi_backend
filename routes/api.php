@@ -50,7 +50,8 @@ Route::middleware('auth:sanctum')->group(function () {
     
     // Dashboard Guru
     Route::get('/dashboard/guru', [DashboardController::class, 'index']);
-
+    Route::get('/dashboard/detail-status', [DashboardController::class, 'detailStatus']);
+    
     // --- MANAJEMEN DATA (GURU) ---
     // Sekolah
     Route::post('/sekolah/update', [SekolahController::class, 'update']);

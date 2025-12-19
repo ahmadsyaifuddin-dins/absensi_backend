@@ -53,4 +53,57 @@ class DashboardController extends Controller
             ]
         ]);
     }
+
+    // LIHAT DETAIL SISWA BERDASARKAN STATUS
+    public function detailStatus(Request $request)
+    {
+        $today = Carbon::today();
+        $status = $request->query('status'); // hadir, sakit, izin, belum
+
+        // Validasi input
+        if (!in_array($status, ['hadir', 'sakit', 'izin', 'belum'])) {
+            return response()->json(['message' => 'Status tidak valid'], 400);
+        }
+
+        $dataSiswa = [];
+
+        if ($status == 'belum') {
+            // LOGIC BELUM ABSEN (AGAK TRICKY)
+            // 1. Ambil ID siswa yang SUDAH absen hari ini
+            $idSudahAbsen = Absensi::whereDate('tanggal', $today)
+                                   ->pluck('pengguna_id')
+                                   ->toArray();
+
+            // 2. Ambil Siswa yang ID-nya TIDAK ADA di daftar $idSudahAbsen
+            $dataSiswa = User::where('role', 'siswa')
+                             ->whereNotIn('id', $idSudahAbsen)
+                             ->with('kelas') // Load nama kelas
+                             ->orderBy('nama', 'asc')
+                             ->get();
+                             
+        } else {
+            // LOGIC HADIR / SAKIT / IZIN
+            // Ambil dari tabel Absensi, join ke tabel User
+            $absensi = Absensi::with(['user', 'user.kelas']) // Load user & kelasnya
+                              ->whereDate('tanggal', $today)
+                              ->where('status', ucfirst($status)) // "hadir" -> "Hadir"
+                              ->orderBy('created_at', 'desc')
+                              ->get();
+            
+            // Format ulang data biar seragam sama format 'belum'
+            // Kita extract user-nya saja dari object absensi
+            $dataSiswa = $absensi->map(function($item) {
+                $user = $item->user;
+                // Tempelkan info jam masuk / bukti izin ke object user (opsional, buat info tambahan)
+                $user->info_tambahan = $item->jam_masuk ?? $item->catatan; 
+                $user->bukti_izin = $item->bukti_izin;
+                return $user;
+            });
+        }
+
+        return response()->json([
+            'message' => 'Detail Siswa: ' . ucfirst($status),
+            'data' => $dataSiswa
+        ]);
+    }
 }
