@@ -8,7 +8,6 @@ use App\Models\HariLibur;
 use App\Models\PengaturanSekolah;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class AbsensiController extends Controller
@@ -21,9 +20,9 @@ class AbsensiController extends Controller
         $user = $request->user();
         $today = Carbon::today();
 
-        // A. CEK HARI SABTU & MINGGU (FIXED) 
+        // A. CEK HARI SABTU & MINGGU (FIXED)
         // Logic: Jika Hari Weekend DAN Bypass-nya TIDAK aktif, maka tolak.
-        if ($today->isWeekend() && env('BYPASS_WEEKEND') != true) { 
+        if ($today->isWeekend() && env('BYPASS_WEEKEND') != true) {
             return response()->json([
                 'message' => 'Hari ini akhir pekan (Sabtu/Minggu), sekolah libur!',
             ], 400);
@@ -33,7 +32,7 @@ class AbsensiController extends Controller
         $libur = HariLibur::where('tanggal', $today->toDateString())->first();
         if ($libur) {
             return response()->json([
-                'message' => 'Sekolah Libur: ' . $libur->keterangan,
+                'message' => 'Sekolah Libur: '.$libur->keterangan,
             ], 400);
         }
 
@@ -65,8 +64,8 @@ class AbsensiController extends Controller
         $jarakMeter = $this->calculateDistance(
             $request->latitude,
             $request->longitude,
-            $setting->latitude, 
-            $setting->longitude  
+            $setting->latitude,
+            $setting->longitude
         );
 
         $jarakMeter = round($jarakMeter);
@@ -93,9 +92,9 @@ class AbsensiController extends Controller
 
         // 7. Simpan Foto
         $file = $request->file('foto');
-        $namaFile = time() . '_' . Str::random(10) . '.jpg';
+        $namaFile = time().'_'.Str::random(10).'.jpg';
         $file->move(public_path('absensi'), $namaFile);
-        $fotoPath = 'absensi/' . $namaFile;
+        $fotoPath = 'absensi/'.$namaFile;
 
         // 8. SIMPAN KE DATABASE
         $absensi = Absensi::create([
@@ -123,15 +122,15 @@ class AbsensiController extends Controller
     {
         $user = $request->user();
         $today = Carbon::today();
-        
+
         // --- LOGIC STATUS LIBUR UNTUK UI ---
         $isHoliday = false;
-        $holidayMessage = "";
+        $holidayMessage = '';
 
         // 1. Cek Weekend
         if ($today->isWeekend()) {
             $isHoliday = true;
-            $holidayMessage = "Libur Akhir Pekan";
+            $holidayMessage = 'Libur Akhir Pekan';
         } else {
             // 2. Cek Database Libur
             $libur = HariLibur::where('tanggal', $today->toDateString())->first();
@@ -143,10 +142,10 @@ class AbsensiController extends Controller
 
         // Cek Data Absen
         $absen = Absensi::where('pengguna_id', $user->id)
-                        ->whereDate('tanggal', $today)
-                        ->first();
+            ->whereDate('tanggal', $today)
+            ->first();
 
-        $user->load('kelas'); 
+        $user->load('kelas');
         $namaKelas = $user->kelas ? $user->kelas->nama_kelas : 'Belum ada kelas';
 
         return response()->json([
@@ -157,8 +156,8 @@ class AbsensiController extends Controller
                 'nama_kelas' => $namaKelas,
                 // Kirim info libur ke Frontend
                 'is_holiday' => $isHoliday,
-                'holiday_message' => $holidayMessage
-            ]
+                'holiday_message' => $holidayMessage,
+            ],
         ]);
     }
 
@@ -188,7 +187,7 @@ class AbsensiController extends Controller
 
         // Cek Libur juga disini (Masa izin pas hari libur?)
         if ($today->isWeekend() || HariLibur::where('tanggal', $today->toDateString())->exists()) {
-             return response()->json([
+            return response()->json([
                 'message' => 'Hari ini libur, tidak perlu mengajukan izin.',
             ], 400);
         }
@@ -210,9 +209,9 @@ class AbsensiController extends Controller
         ]);
 
         $file = $request->file('bukti_izin');
-        $namaFile = time() . '_' . Str::random(10) . '.jpg';
+        $namaFile = time().'_'.Str::random(10).'.jpg';
         $file->move(public_path('izin'), $namaFile);
-        $fotoPath = 'izin/' . $namaFile;
+        $fotoPath = 'izin/'.$namaFile;
 
         $absensi = Absensi::create([
             'pengguna_id' => $user->id,
@@ -235,7 +234,7 @@ class AbsensiController extends Controller
     private function calculateDistance($lat1, $lon1, $lat2, $lon2)
     {
         // Radius Bumi ke METER
-        $earthRadius = 6371000; // 6371 KM * 1000 
+        $earthRadius = 6371000; // 6371 KM * 1000
 
         $dLat = deg2rad($lat2 - $lat1);
         $dLon = deg2rad($lon2 - $lon1);
@@ -246,7 +245,7 @@ class AbsensiController extends Controller
 
         $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
 
-        $distance = $earthRadius * $c; 
+        $distance = $earthRadius * $c;
 
         return $distance;
     }

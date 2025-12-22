@@ -19,7 +19,6 @@ class DatabaseSeeder extends Seeder
             'longitude_kantor' => 114.591000,
             'radius_km' => 0.05, // 50 Meter
             'jam_masuk' => '07:30:00',
-            'jam_pulang' => '15:00:00',
         ]);
 
         // 2. Setup Data Kelas
